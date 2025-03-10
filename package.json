@@ -1,0 +1,32 @@
+{
+  "name": "aplicacao-dmytro",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DNB13/Aplicacao-Dmytro.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/DNB13/Aplicacao-Dmytro/issues"
+  },
+  "homepage": "https://github.com/DNB13/Aplicacao-Dmytro#readme",
+  "dependencies": {
+    "axios": "^1.8.2",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "node-fetch": "^3.3.2",
+    "ssh2": "^1.16.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.10"
+  }
+}
