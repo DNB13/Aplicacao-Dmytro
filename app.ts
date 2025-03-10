@@ -1,9 +1,11 @@
+import dotenv from 'dotenv';
 import express, { Request, Response } from 'express';
 import { TaskQueue } from './taskQueue';
 import { uploadMedia } from './shopifyService';
 
 const app = express();
 app.use(express.json());
+dotenv.config();
 
 const taskQueue = new TaskQueue(2);
 
