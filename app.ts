@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import express, { Request, Response } from 'express';
 import { TaskQueue } from './taskQueue';
 import { uploadMedia } from './shopifyService';
+import { enqueueImageUpload } from './uploadService';
 
 const app = express();
 app.use(express.json());
@@ -33,6 +34,17 @@ app.post('/enqueue-task', async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Erro ao processar a tarefa:", error);
     res.status(500).send("Erro ao processar a tarefa.");
+  }
+});
+
+app.post('/upload-image', async (req: Request, res: Response) => {
+  const { input, productId, alt } = req.body;
+  try {
+    // Enqueue the image upload task.
+    await enqueueImageUpload(input, productId, alt);
+    res.status(202).send("Image upload task queued successfully.");
+  } catch (error) {
+    res.status(500).send(`Error queuing image upload: ${error}`);
   }
 });
 
