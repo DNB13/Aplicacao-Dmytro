@@ -77,32 +77,29 @@ export async function processImageUpload(input: string, productId: string, alt: 
     let resourceUrl: string | null = null;
 
     if (isValidUrl(input)) {
-      // Input is a URL – verify accessibility
       log(`Input is a URL: ${input}`);
+      // Verify accessibility (if needed)
       const accessible = await verifyUrl(input);
       if (!accessible) {
         throw new Error(`URL not accessible: ${input}`);
       }
-      // Use external URL directly
+      // For external URLs, use them directly
       resourceUrl = input;
     } else if (isBase64Image(input)) {
-      // Input is a base64 string – convert to buffer
       log(`Input is a base64 image.`);
       const imageBuffer = base64ToBuffer(input);
-      // For demonstration, we set a filename and mimeType
       const filename = "upload_image.png";
       const mimeType = "image/png";
+      // Call the real staged upload function
       resourceUrl = await stagedUpload(imageBuffer, filename, mimeType);
     } else {
       throw new Error("Invalid input format. Must be a valid URL or a base64-encoded image.");
     }
 
-    // Ensure we have a resource URL at this point
     if (!resourceUrl) {
       throw new Error("Failed to obtain resource URL for image upload.");
     }
 
-    // Now attach the image to the product using Shopify's GraphQL mutation (stubbed)
     const attached = await attachImageToProduct(resourceUrl, productId, alt);
     if (!attached) {
       throw new Error("Failed to attach image to product.");

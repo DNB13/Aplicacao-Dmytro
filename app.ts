@@ -1,5 +1,7 @@
 import dotenv from 'dotenv';
+import path from 'path';
 import express, { Request, Response } from 'express';
+import fs from 'fs';
 import { TaskQueue } from './taskQueue';
 import { uploadMedia } from './shopifyService';
 import { enqueueImageUpload } from './uploadService';
@@ -13,18 +15,23 @@ const taskQueue = new TaskQueue(2);
 // Endpoint a tarefa de upload
 app.post('/enqueue-task', async (req: Request, res: Response) => {
   try {
-    const { mediaUrl, productId } = req.body;
+    // Expecting filePath and productId in the request body
+    const { filePath, productId } = req.body;
     
-    // Define a tarefa para fazer o upload via GraphQL
+    if (!filePath || !productId) {
+      throw new Error("Missing required fields: filePath and productId");
+    }
+    
+    // Read the file from disk
+    const absolutePath = path.resolve(filePath);
+    const imageBuffer = fs.readFileSync(absolutePath);
+    const filename = path.basename(absolutePath);
+    // Set the MIME type appropriately; adjust if needed (e.g., "image/png")
+    const mimeType = "image/jpeg";
+    
+    // Define the task for staged upload via GraphQL
     const task = async (): Promise<string> => {
-      const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
-      const storeDomain = process.env.SHOPIFY_FLAG_STORE;
-
-      if (!accessToken || !storeDomain) {
-        throw new Error('Missing Shopify configuration: accessToken or storeDomain is not defined');
-      }
-
-      const result = await uploadMedia(mediaUrl, productId, accessToken, storeDomain);
+      const result = await uploadMedia(imageBuffer, filename, mimeType);
       console.log("Resultado do upload:", result);
       return JSON.stringify(result);
     };
