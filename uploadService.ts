@@ -1,9 +1,10 @@
 import fetch from 'node-fetch';
 import { TaskQueue } from './taskQueue';
+import { uploadMedia, attachImageToProduct } from './shopifyService';
 import * as fs from 'fs';
 
-// A simple logger for our purposes
-function log(message: string) {
+// A simple logger
+function log(message: string): void {
   console.log(`[${new Date().toISOString()}] ${message}`);
 }
 
@@ -22,7 +23,7 @@ function isBase64Image(input: string): boolean {
   return input.startsWith("data:image/");
 }
 
-// Helper: Convert base64 string to Buffer (stripping data URI prefix if present)
+// Helper: Convert base64 string to Buffer (strip data URI prefix)
 function base64ToBuffer(data: string): Buffer {
   const base64Data = data.includes(',') ? data.split(',')[1] : data;
   return Buffer.from(base64Data, 'base64');
@@ -33,7 +34,7 @@ async function verifyUrl(url: string): Promise<boolean> {
   try {
     let response = await fetch(url, { method: 'HEAD' });
     if (!response.ok) {
-      // Fallback: try a GET request with a short timeout
+      // Fallback: try GET with a 3-second timeout.
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);
       response = await fetch(url, { method: 'GET', signal: controller.signal });
@@ -46,52 +47,30 @@ async function verifyUrl(url: string): Promise<boolean> {
   }
 }
 
-// Stub: Perform staged upload (for local or base64 images)
-// In a real implementation, this function would call Shopify's stagedUploadsCreate mutation,
-// then use the returned URL and parameters to perform an HTTP file upload.
-// Here we simulate it by returning a dummy resource URL.
-async function stagedUpload(imageBuffer: Buffer, filename: string, mimeType: string): Promise<string> {
-  log(`Performing staged upload for ${filename} (${mimeType})...`);
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  // Return a simulated resource URL (in practice, use the response from Shopify)
-  return `https://cdn.shopify.com/s/files/.../${filename}`;
-}
-
-// Stub: Call the productCreateMedia GraphQL mutation to attach the image to a product.
-// In a real implementation, this function would perform an authenticated HTTP POST
-// to Shopify's GraphQL endpoint using fetch (or similar) with the correct query and variables.
-async function attachImageToProduct(resourceUrl: string, productId: string, alt: string): Promise<boolean> {
-  log(`Attaching image to product ${productId} with resource URL ${resourceUrl}...`);
-  // Simulate network delay and API processing
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  // Simulate a successful attachment
-  return true;
-}
-
-// Process an image upload task.
-// This function detects the input type, verifies accessibility if needed,
-// performs the staged upload if required, and then calls the product media mutation.
+/**
+ * processImageUpload: Determines input type (URL or base64),
+ * verifies external URL accessibility,
+ * or if base64, converts to Buffer and calls uploadMedia to perform staged upload.
+ * Then calls attachImageToProduct to attach the image to the product.
+ */
 export async function processImageUpload(input: string, productId: string, alt: string): Promise<void> {
   try {
     let resourceUrl: string | null = null;
 
     if (isValidUrl(input)) {
       log(`Input is a URL: ${input}`);
-      // Verify accessibility (if needed)
       const accessible = await verifyUrl(input);
       if (!accessible) {
         throw new Error(`URL not accessible: ${input}`);
       }
-      // For external URLs, use them directly
+      // If it's an external URL, use it directly.
       resourceUrl = input;
     } else if (isBase64Image(input)) {
       log(`Input is a base64 image.`);
       const imageBuffer = base64ToBuffer(input);
-      const filename = "upload_image.png";
+      const filename = "upload_image.png";  // Ideally generate a unique filename
       const mimeType = "image/png";
-      // Call the real staged upload function
-      resourceUrl = await stagedUpload(imageBuffer, filename, mimeType);
+      resourceUrl = await uploadMedia(imageBuffer, filename, mimeType);
     } else {
       throw new Error("Invalid input format. Must be a valid URL or a base64-encoded image.");
     }
@@ -110,12 +89,13 @@ export async function processImageUpload(input: string, productId: string, alt: 
   }
 }
 
-// Create a task queue instance with concurrency 3
 export const imageUploadQueue = new TaskQueue(3);
 
-// Function to add an image upload task with retry logic
+/**
+ * enqueueImageUpload: Wraps the image upload process in a task, adding retry logic,
+ * then enqueues the task for processing.
+ */
 export async function enqueueImageUpload(input: string, productId: string, alt: string): Promise<void> {
-  // Define a task that will try the upload once, and if it fails, try one more time.
   const task = async (): Promise<void> => {
     let attempts = 0;
     const maxAttempts = 2;
@@ -124,11 +104,10 @@ export async function enqueueImageUpload(input: string, productId: string, alt: 
         attempts++;
         log(`Processing image upload for product ${productId} (attempt ${attempts})...`);
         await processImageUpload(input, productId, alt);
-        return; // success
+        return; // Success
       } catch (err) {
         log(`Error processing image upload (attempt ${attempts}): ${err}`);
         if (attempts >= maxAttempts) {
-          // Log the failure for later review and exit the loop
           log(`Image upload failed after ${attempts} attempts. Discarding image.`);
           return;
         }
@@ -136,6 +115,5 @@ export async function enqueueImageUpload(input: string, productId: string, alt: 
     }
   };
 
-  // Enqueue the task; the task queue returns a Promise that resolves when processed.
   await imageUploadQueue.add(task);
 }

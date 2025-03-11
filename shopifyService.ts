@@ -27,7 +27,11 @@ interface StagedUploadsResponse {
   };
 }
 
-// Function to perform staged upload and return resourceUrl
+/**
+ * uploadMedia: Calls the stagedUploadsCreate mutation,
+ * then uploads the file using the returned URL/parameters,
+ * and returns the resourceUrl that Shopify provides.
+ */
 export async function uploadMedia(
   imageBuffer: Buffer,
   filename: string,
@@ -53,6 +57,7 @@ export async function uploadMedia(
     }
   `;
   
+  // Shopify expects fileSize as a string.
   const fileSize = imageBuffer.length.toString();
   const variables = {
     input: [{
@@ -64,7 +69,7 @@ export async function uploadMedia(
     }]
   };
 
-  // Call Shopify GraphQL to get staged upload target.
+  // Call Shopify's GraphQL endpoint to get the staged upload target.
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
@@ -75,7 +80,7 @@ export async function uploadMedia(
   });
   
   const json = await response.json() as StagedUploadsResponse;
-  console.log("Shopify response:", JSON.stringify(json, null, 2)); // Log full response
+  console.log("Shopify stagedUploadsCreate response:", JSON.stringify(json, null, 2));
 
   if (json.data?.stagedUploadsCreate?.userErrors && json.data.stagedUploadsCreate.userErrors.length > 0) {
     throw new Error(`Staged upload error: ${JSON.stringify(json.data.stagedUploadsCreate.userErrors)}`);
@@ -90,14 +95,14 @@ export async function uploadMedia(
     throw new Error('No staged target received');
   }
   
-  // Prepare a FormData for the file upload.
+  // Prepare a FormData object with the returned parameters and file.
   const form = new FormData();
   target.parameters.forEach((param: { name: string; value: string }) => {
     form.append(param.name, param.value);
   });
   form.append('file', imageBuffer, { filename, contentType: mimeType });
   
-  // Upload the file to the staged URL.
+  // Upload the file to Shopify's storage URL.
   const uploadResponse = await fetch(target.url, {
     method: 'POST',
     body: form as any
@@ -113,6 +118,10 @@ export async function uploadMedia(
 interface ProductCreateMediaResponseData {
   productCreateMedia?: {
     mediaUserErrors?: { field: string; message: string }[];
+    media?: Array<{
+      id: string;
+      image?: { originalSrc: string };
+    }>;
   };
 }
 
@@ -120,7 +129,10 @@ interface ProductCreateMediaResponse {
   data?: ProductCreateMediaResponseData;
 }
 
-// Function to attach the uploaded image to a product.
+/**
+ * attachImageToProduct: Calls the productCreateMedia mutation to attach the image
+ * (using the provided resourceUrl) to the given product.
+ */
 export async function attachImageToProduct(
   resourceUrl: string,
   productId: string,
@@ -165,7 +177,8 @@ export async function attachImageToProduct(
   });
   
   const json = await response.json() as ProductCreateMediaResponse;
-  console.log("Shopify response:", JSON.stringify(json, null, 2));
+  console.log("Shopify productCreateMedia response:", JSON.stringify(json, null, 2));
+  
   if (json.data?.productCreateMedia?.mediaUserErrors && json.data.productCreateMedia.mediaUserErrors.length > 0) {
     throw new Error(`productCreateMedia error: ${JSON.stringify(json.data.productCreateMedia.mediaUserErrors)}`);
   }
